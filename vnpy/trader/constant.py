@@ -4,7 +4,7 @@ General constant enums used in the trading platform.
 
 from enum import Enum
 
-from .locale import _
+from .locale2 import _
 
 
 class Direction(Enum):
@@ -156,3 +156,4 @@ class Interval(Enum):
     DAILY = "d"
     WEEKLY = "w"
     TICK = "tick"
+    MINUTE5 = "5m"

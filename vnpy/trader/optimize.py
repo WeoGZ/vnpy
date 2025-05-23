@@ -11,7 +11,7 @@ from _collections_abc import dict_keys, dict_values, Iterable
 from tqdm import tqdm                                   # type: ignore
 from deap import creator, base, tools, algorithms       # type: ignore
 
-from .locale import _
+from .locale2 import _
 
 OUTPUT_FUNC = Callable[[str], None]
 EVALUATE_FUNC = Callable[[dict], dict]

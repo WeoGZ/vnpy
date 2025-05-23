@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo, available_timezones      # noqa
 
 from .object import BarData, TickData
 from .constant import Exchange, Interval
-from .locale import _
+from .locale2 import _
 
 
 def extract_vt_symbol(vt_symbol: str) -> tuple[str, Exchange]:
@@ -262,7 +262,7 @@ class BarGenerator:
         """
         Update 1 minute bar into generator
         """
-        if self.interval == Interval.MINUTE:
+        if self.interval == Interval.MINUTE or self.interval == Interval.MINUTE5:
             self.update_bar_minute_window(bar)
         elif self.interval == Interval.HOUR:
             self.update_bar_hour_window(bar)
@@ -301,9 +301,10 @@ class BarGenerator:
         self.window_bar.open_interest = bar.open_interest
 
         # Check if window bar completed
-        if not (bar.datetime.minute + 1) % self.window:
+        if not (bar.datetime.minute + (1 if self.interval == Interval.MINUTE else 5)) % self.window:
             if self.on_window_bar:
                 self.on_window_bar(self.window_bar)
+                # print(f'window_bar: {self.window_bar}')
 
             self.window_bar = None
 

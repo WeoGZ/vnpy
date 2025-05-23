@@ -35,7 +35,7 @@ from ..object import (
 )
 from ..utility import load_json, save_json, get_digits, ZoneInfo
 from ..setting import SETTING_FILENAME, SETTINGS
-from ..locale import _
+from ..locale2 import _
 
 
 COLOR_LONG = QtGui.QColor("red")

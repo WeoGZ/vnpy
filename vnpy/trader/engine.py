@@ -42,7 +42,7 @@ from .setting import SETTINGS
 from .utility import TRADER_DIR
 from .converter import OffsetConverter
 from .logger import logger, DEBUG, INFO, WARNING, ERROR, CRITICAL
-from .locale import _
+from .locale2 import _
 
 
 EngineType = TypeVar("EngineType", bound="BaseEngine")

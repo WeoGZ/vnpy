@@ -30,7 +30,7 @@ from .widget import (
 )
 from ..engine import MainEngine, BaseApp
 from ..utility import get_icon_path, TRADER_DIR
-from ..locale import _
+from ..locale2 import _
 
 
 WidgetType = TypeVar("WidgetType", bound="QtWidgets.QWidget")

@@ -12,7 +12,7 @@ from loguru import logger
 
 from ..setting import SETTINGS
 from ..utility import get_icon_path
-from ..locale import _
+from ..locale2 import _
 
 
 Qt = QtCore.Qt
