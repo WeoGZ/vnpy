@@ -93,6 +93,7 @@ class BarData(BaseData):
     symbol: str
     exchange: Exchange
     datetime: Datetime
+    close_datetime: Datetime = None  # K线结束时间
 
     interval: Interval | None = None
     volume: float = 0

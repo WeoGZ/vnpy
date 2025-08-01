@@ -3,6 +3,7 @@ General constant enums used in the trading platform.
 """
 
 from enum import Enum
+from datetime import datetime, timedelta
 
 from .locale2 import _
 
@@ -157,3 +158,20 @@ class Interval(Enum):
     WEEKLY = "w"
     TICK = "tick"
     MINUTE5 = "5m"
+
+
+# 30分钟白天交易时间分段K线结束时间
+TRADE_TIME_DAYTIME_30M: list[tuple] = [(9, 30), (10, 0), (10, 45), (11, 15), (13, 45), (14, 15), (14, 45), (15, 0)]
+# 1小时白天交易时间分段K线结束时间
+TRADE_TIME_DAYTIME_1H: list[tuple] = [(10, 0), (11, 15), (14, 15), (15, 0)]
+# 2小时白天交易时间分段K线结束时间
+TRADE_TIME_DAYTIME_2H: list[tuple] = [(11, 15), (15, 0)]
+
+
+INTERVAL_DELTA_MAP: dict[Interval, timedelta] = {
+    Interval.TICK: timedelta(milliseconds=1),
+    Interval.MINUTE: timedelta(minutes=1),
+    Interval.HOUR: timedelta(hours=1),
+    Interval.DAILY: timedelta(days=1),
+    Interval.MINUTE5: timedelta(minutes=5),
+}

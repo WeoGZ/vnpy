@@ -15,8 +15,9 @@ import talib
 from zoneinfo import ZoneInfo, available_timezones      # noqa
 
 from .object import BarData, TickData
-from .constant import Exchange, Interval
+# from .constant import Exchange, Interval
 from .locale2 import _
+from .constant import *
 
 
 def extract_vt_symbol(vt_symbol: str) -> tuple[str, Exchange]:
@@ -258,19 +259,22 @@ class BarGenerator:
 
         self.last_tick = tick
 
-    def update_bar(self, bar: BarData) -> None:
+    def update_bar(self, bar: BarData, timeType: int = 0) -> None:
         """
         Update 1 minute bar into generator
         """
         if self.interval == Interval.MINUTE or self.interval == Interval.MINUTE5:
-            self.update_bar_minute_window(bar)
+            self.update_bar_minute_window(bar, timeType)
         elif self.interval == Interval.HOUR:
             self.update_bar_hour_window(bar)
         else:
             self.update_bar_daily_window(bar)
 
-    def update_bar_minute_window(self, bar: BarData) -> None:
-        """"""
+    def update_bar_minute_window(self, bar: BarData, timeType: int = 0) -> None:
+        """
+        【参数说明】
+        timeType：0表示自然时间制（股票、股指使用），1表示交易时间制（商品期货使用）
+        """
         # If not inited, create window bar object
         if not self.window_bar:
             dt: datetime = bar.datetime.replace(second=0, microsecond=0)
@@ -278,6 +282,7 @@ class BarGenerator:
                 symbol=bar.symbol,
                 exchange=bar.exchange,
                 datetime=dt,
+                close_datetime=dt,
                 gateway_name=bar.gateway_name,
                 open_price=bar.open_price,
                 high_price=bar.high_price,
@@ -301,12 +306,46 @@ class BarGenerator:
         self.window_bar.open_interest = bar.open_interest
 
         # Check if window bar completed
-        if not (bar.datetime.minute + (1 if self.interval == Interval.MINUTE else 5)) % self.window:
-            if self.on_window_bar:
-                self.on_window_bar(self.window_bar)
-                # print(f'window_bar: {self.window_bar}')
+        minute_extra = 1
+        if self.interval == Interval.MINUTE5:
+            minute_extra = 5
+        if timeType == 1 and self.window in (30, 60, 120) and bar.datetime.hour>=9 and bar.datetime.hour < 15:  # 15分钟以上级别的周期由于有小休，需要特殊处理
+            tradeTimeList = TRADE_TIME_DAYTIME_30M
+            if self.window == 60:
+                tradeTimeList = TRADE_TIME_DAYTIME_1H
+            elif self.window == 120:
+                tradeTimeList = TRADE_TIME_DAYTIME_2H
+            for tradetimeTuple in tradeTimeList:
+                nextBarTime = bar.datetime + INTERVAL_DELTA_MAP[self.interval]
+                if nextBarTime.hour == tradetimeTuple[0] and nextBarTime.minute == tradetimeTuple[1]:
+                    if self.on_window_bar:
+                        self.window_bar.close_datetime = nextBarTime
+                        self.on_window_bar(self.window_bar)
+                        # print(f'window_bar: {self.window_bar}')
 
-            self.window_bar = None
+                    self.window_bar = None
+                    break
+        else:
+            newWindow = self.window if self.window <= 60 else 60
+            if not (bar.datetime.minute + minute_extra) % newWindow:
+                if self.window == 120:  # 120分钟周期需要特殊处理：要累积2个1小时
+                    self.interval_count += 1
+                    if self.interval_count == 2:
+                        if self.on_window_bar:
+                            nextBarTime = bar.datetime + INTERVAL_DELTA_MAP[self.interval]
+                            self.window_bar.close_datetime = nextBarTime
+                            self.on_window_bar(self.window_bar)
+                            # print(f'window_bar: {self.window_bar}')
+
+                        self.window_bar = None
+                else:
+                    if self.on_window_bar:
+                        nextBarTime = bar.datetime + INTERVAL_DELTA_MAP[self.interval]
+                        self.window_bar.close_datetime = nextBarTime
+                        self.on_window_bar(self.window_bar)
+                        # print(f'window_bar: {self.window_bar}')
+
+                    self.window_bar = None
 
     def update_bar_hour_window(self, bar: BarData) -> None:
         """"""
@@ -492,11 +531,13 @@ class ArrayManager:
     2. calculating technical indicator value
     """
 
-    def __init__(self, size: int = 100) -> None:
+    def __init__(self, size: int = 100, startDate: datetime = None) -> None:
         """Constructor"""
         self.count: int = 0
         self.size: int = size
         self.inited: bool = False
+
+        self.startDate = startDate
 
         self.open_array: np.ndarray = np.zeros(size)
         self.high_array: np.ndarray = np.zeros(size)
@@ -505,13 +546,17 @@ class ArrayManager:
         self.volume_array: np.ndarray = np.zeros(size)
         self.turnover_array: np.ndarray = np.zeros(size)
         self.open_interest_array: np.ndarray = np.zeros(size)
+        self.datetime_array: np.ndarray = [datetime(1990, 1, 1, 0, 0, 0)] * size
+        self.close_datetime_array: np.ndarray = [datetime(1990, 1, 1, 0, 0, 0)] * size
 
     def update_bar(self, bar: BarData) -> None:
         """
         Update new bar data into array manager.
         """
         self.count += 1
-        if not self.inited and self.count >= self.size:
+        # if not self.inited and self.count >= self.size:
+        if not self.inited and (bar.datetime.replace(tzinfo=None) >= self.startDate if self.startDate is not None else
+                                self.count >= self.size):
             self.inited = True
 
         self.open_array[:-1] = self.open_array[1:]
@@ -521,6 +566,8 @@ class ArrayManager:
         self.volume_array[:-1] = self.volume_array[1:]
         self.turnover_array[:-1] = self.turnover_array[1:]
         self.open_interest_array[:-1] = self.open_interest_array[1:]
+        self.datetime_array[:-1] = self.datetime_array[1:]
+        self.close_datetime_array[:-1] = self.close_datetime_array[1:]
 
         self.open_array[-1] = bar.open_price
         self.high_array[-1] = bar.high_price
@@ -529,6 +576,8 @@ class ArrayManager:
         self.volume_array[-1] = bar.volume
         self.turnover_array[-1] = bar.turnover
         self.open_interest_array[-1] = bar.open_interest
+        self.datetime_array[-1] = bar.datetime
+        self.close_datetime_array[-1] = bar.close_datetime
 
     @property
     def open(self) -> np.ndarray:
@@ -578,6 +627,20 @@ class ArrayManager:
         Get trading volume time series.
         """
         return self.open_interest_array
+
+    @property
+    def datetime(self) -> np.ndarray:
+        """
+        Get datetime time series.
+        """
+        return self.datetime_array
+
+    @property
+    def close_datetime(self) -> np.ndarray:
+        """
+        Get datetime time series.
+        """
+        return self.close_datetime_array
 
     def sma(self, n: int, array: bool = False) -> float | np.ndarray:
         """
