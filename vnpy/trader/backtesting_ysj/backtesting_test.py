@@ -34,21 +34,21 @@ def doTestBacktesting():
     daily_pnl, statistic = executeTestBacktesting(w_s12_strategy.WS12Strategy, {"len": 250, "stpr": 20, "n": 70},
                                                   "RBL9.SHFE", Interval.MINUTE5, startDate, endDate,
                                                   0.0002, 1, 10, 1, 15000,
-                                                  60, showOrders=True)
-    # daily_pnl2, statistic2 = executeTestBacktesting(w_s12_strategy.WS12Strategy, {"len": 50, "stpr": 15, "n": 20},
-    #                                               "SAL9.CZCE", Interval.MINUTE5, startDate, endDate,
-    #                                               0.0003, 1, 20, 1, 15000,
-    #                                               60, showOrders=True)
-    # daily_pnl2, statistic2 = executeTestBacktesting(w_s12_strategy.WS12Strategy, {"len": 130, "stpr": 40, "n": 20},
-    #                                               "AOL9.SHFE", Interval.MINUTE5, startDate, endDate,
-    #                                               0.0002, 1, 20, 1, 20000,
-    #                                               60, showOrders=True)
+                                                  60, showOrders=True, pre_load_month=1)
+    daily_pnl2, statistic2 = executeTestBacktesting(w_s12_strategy.WS12Strategy, {"len": 50, "stpr": 15, "n": 20},
+                                                  "SAL9.CZCE", Interval.MINUTE5, startDate, endDate,
+                                                  0.0003, 1, 20, 1, 15000,
+                                                  60, showOrders=True)  # 纯碱有一点误差，原因是通达信数据与文华数据差异性导致
+    daily_pnl3, statistic3 = executeTestBacktesting(w_s12_strategy.WS12Strategy, {"len": 130, "stpr": 40, "n": 20},
+                                                  "AOL9.SHFE", Interval.MINUTE5, startDate, endDate,
+                                                  0.0002, 1, 20, 1, 20000,
+                                                  60, showOrders=True, pre_load_month=2)
     # 合并组合测试
-    # engine = BacktestingEngine()
-    # engine.capital = 30000
-    # sum_daily_pnl = daily_pnl + daily_pnl2
-    # sum_daily_pnl = sum_daily_pnl.dropna()
-    # final_statistic = engine.calculate_statistics(sum_daily_pnl)
+    engine = BacktestingEngine()
+    engine.capital = 50000
+    sum_daily_pnl = daily_pnl + daily_pnl2 + daily_pnl3
+    sum_daily_pnl = sum_daily_pnl.dropna()
+    final_statistic = engine.calculate_statistics(sum_daily_pnl)
 
 
 def doTestDynamicOptimization(startDate: datetime, endDate: datetime, trainDayLength: int, testDayLength: int):
@@ -57,7 +57,7 @@ def doTestDynamicOptimization(startDate: datetime, endDate: datetime, trainDayLe
     ### 切割日期
     # 获取螺纹钢指数的所有交易日（代表市场交易日）
     allTradeDates = getAllTradeDate('RBL9', Exchange.SHFE, datetime(1900, 1, 1),
-                                    datetime(2050, 12, 31))
+                                    datetime(2100, 12, 31))
     if not allTradeDates:
         print(r'***获取全部交易日失败')
         return
@@ -83,9 +83,14 @@ def doTestDynamicOptimization(startDate: datetime, endDate: datetime, trainDayLe
                 _endIndex = len(allTradeDates) - 1
                 skip = True
             _endDate = getRealTradeDatetime(allTradeDates, _endIndex, 1)
+            optSetting = OptimizationSetting()
+            optSetting.set_target("sharpe_ratio")
+            optSetting.add_parameter("fast_window", 5, 20, 5)
+            optSetting.add_parameter("slow_window", 30, 60, 5)
             optResults = executeTestBacktesting(double_ma_strategy.DoubleMaStrategy, {}, "RBL9.SHFE",
                                                 Interval.MINUTE5, _startDate, _endDate, 0.0002, 1,
-                                                10, 1, 15000, True, False)
+                                                10, 1, 15000, 60, True,
+                                                False, optSetting=optSetting)
             selectedParams = optResults[0]
             printInfo(f'训练区间[{_startDate}-{_endDate}]，最优参数={selectedParams}')
             # printInfo(f'训练区间[{_startDate}-{_endDate}]')
@@ -97,9 +102,10 @@ def doTestDynamicOptimization(startDate: datetime, endDate: datetime, trainDayLe
                 _endIndex = len(allTradeDates) - 1
                 skip = True
             _endDate = getRealTradeDatetime(allTradeDates, _endIndex, 1)
-            daily_df, statistic = executeTestBacktesting(double_ma_strategy.DoubleMaStrategy, selectedParams, "RBL9.SHFE",
-                                                         Interval.MINUTE5, _startDate, _endDate, 0.0002, 1,
-                                                         10, 1, 15000, False, False)
+            daily_df, statistic = executeTestBacktesting(double_ma_strategy.DoubleMaStrategy, selectedParams,
+                                                         "RBL9.SHFE", Interval.MINUTE5, _startDate, _endDate,
+                                                         0.0002, 1, 10, 1, 15000,
+                                                         60,  False, False)
             daily_pnl = pd.concat([daily_pnl, daily_df], ignore_index=True)  # 拼接每日盈亏
             annual_return = statistic['annual_return']
             max_drawdown = statistic['max_drawdown']
@@ -124,9 +130,18 @@ def doTestDynamicOptimization(startDate: datetime, endDate: datetime, trainDayLe
               f'最大回撤={final_max_drawdown:.2f}，最大回撤率={final_max_ddpercent:.2f}%，夏普比率={final_sharpe_ratio:.2f}')
 
 
+def doTestBfOptimization(strategy_class, symbol, exchange, startDate: datetime, endDate: datetime, rate, slippage,
+                         size, pricetick, capital, minuteWindow, optSetting: OptimizationSetting):
+    startDate = startDate.replace(hour=9, minute=0, second=0, microsecond=0)
+    endDate = endDate.replace(hour=15, minute=0, second=0, microsecond=0)
+    optResults = executeTestBacktesting(strategy_class, {}, symbol + '.' + exchange, Interval.MINUTE5,
+                                        startDate, endDate, rate, slippage, size, pricetick, capital, minuteWindow,
+                                        onlyOptimized=True, optSetting=optSetting, output=True)
+
+
 def executeTestBacktesting(strategy_class, setting: dict, vt_symbol, interval, startDate, endDate, rate, slippage,
                            size, pricetick, capital, minuteWindow=60, onlyOptimized=False, showChart=False,
-                           showOrders=False) -> list | pd.DataFrame:
+                           showOrders=False, pre_load_month=2, optSetting: OptimizationSetting={}, output=False) -> list | pd.DataFrame:
     engine = BacktestingEngine()
     engine.set_parameters(
         vt_symbol=vt_symbol,
@@ -138,17 +153,14 @@ def executeTestBacktesting(strategy_class, setting: dict, vt_symbol, interval, s
         size=size,
         pricetick=pricetick,
         capital=capital,
+        pre_load_month=pre_load_month
     )
     # engine.add_strategy(boll_channel_strategy.BollChannelStrategy, setting)
     # engine.add_strategy(double_ma_strategy.DoubleMaStrategy, setting)
     engine.add_strategy(strategy_class, setting, minuteWindow)
     if onlyOptimized:  # 只做参数优化
-        optSetting = OptimizationSetting()
-        optSetting.set_target("sharpe_ratio")
-        optSetting.add_parameter("fast_window", 5, 20, 5)
-        optSetting.add_parameter("slow_window", 30, 60, 5)
         # engine.run_ga_optimization(setting)
-        results = engine.run_bf_optimization(optSetting, output=False, max_workers=None)
+        results = engine.run_bf_optimization(optSetting, output=output, max_workers=None)
         return results
     else:  # 普通回测
         engine.load_data()
@@ -328,80 +340,23 @@ def getRealTradeDatetime(allTradeDates: list[datetime], index: int, openOrClose:
             return allTradeDates[index].replace(hour=15, minute=0, second=0, microsecond=0)
 
 
-def doTestCommon():
-    """"""
-    # print(f'route={Path.cwd()}')
-    # print(f'result={math.ceil(69/6)}')
-
-    # arr = np.array(([2, 3], [5, 6]))
-    # print(f'arr: {arr}')
-    # result = arr - 1
-    # print(result)
-
-    # arr2 = pd.Series(np.array([2, 3, -1, -2]))
-    # print(f'arr2: {arr2}')
-    # a1 = tafunc.ref(arr2, 1)
-    # a2 = tafunc.hhv(arr2, 2)
-    # a3 = tafunc.barlast(arr2 > 0)
-    # print(f'a1=\n{a1}, \n\na2=\n{a2}, \n\na3=\n{a3}')
-
-    # b1 = np.where(arr2 > 0, arr2, 0)
-    # print(f'b1=\n{b1}')
-
-    # print(f'nan > 1: {np.nan < 1}')
-    # print(f'nan min: {min(np.nan, 3)}, max: {max(np.nan, 3)}')
-
-    # c1 = arr2.rolling([2, 2, 3, 4]).sum()  # rolling函数参数仅支持固定整数
-    # print(f'c1: {c1}')
-
-    arr3 = pd.Series(np.array([1, 1, 2, 3]))
-    # d1 = tafunc.hhv(arr2, arr3)
-    # print(f'd1: {d1}')
-    # d2 = arr2 * arr3
-    # print(f'd2: {d2}')
-
-    # print(f'max: {max(arr2, 1)}')
-    # print(f'max: {max(arr2, arr3)}')
-    # print(f'max: {[max(v, 1) for v in arr2]}')
-
-    # arr4 = pd.Series(np.array([2, 3, -1, np.nan]))
-    # print(f'isnan: {np.isnan(arr4)}')
-
-    # list1 = [1, 2, 3, 4]
-    # print(f'con: {arr2 > 0 and list1 > 2}')
-    # print(f'con: {tafunc.barlast(arr2 > 0 and arr3 < 3)}')
-    # print(f'con: {tafunc.barlast(arr2 > 0 and arr2.shift(1) > 2)}')
-    # ps1 = pd.Series([arr2.iloc[i] > 0 and arr2.iloc[i - 1] > 0 if i > 0 else False for i in range(0, len(list1))])
-    # print(ps1)
-    # print(f'con: {tafunc.barlast(ps1)}')
-
-    # brr1 = pd.Series([False, True, False, True])
-    # brr2 = pd.Series([True, True, True, False])
-    # print(brr1 & brr2)
-
-    # list2 = [1, 2, 3, 2]
-    # print(f'list / list: {list1 / list2}')
-    # print(f'arr / arr: {arr2 / arr3}')
-
-    # arr4 = pd.Series(np.array([1.023, 1.025, 1.026, 2.119, 3]))
-    # list3 = [1.023, 1.025, 1.026, 2.119, 3]
-    arr4 = pd.Series(np.array([1.23, 1.25, 1.35, 1.26, 2.119, 3]))
-    # list3 = [1.23, 1.25, 1.26, 2.119, 3]
-    # print(f'round arr4: {np.around(arr4, 1)}')
-    # print(f'round list3: {np.around(list3, 1)}')
-    # print(f'np.minimum: {np.minimum(arr2, arr3)}')
-
-    nn1 = 1
-    if nn1:
-        print(f'nn1 is not None')
-    else:
-        print(f'nn1 is None')
-
-
 if __name__ == "__main__":
     """"""
+    t0 = datetime.now()
+
     # 回测测试
-    doTestBacktesting()
+    # doTestBacktesting()
+
+    # 参数优化测试
+    startDate = datetime(2024, 1, 1, 9, 0)
+    endDate = datetime(2024, 12, 31)
+    optSetting = OptimizationSetting()
+    optSetting.set_target("sharpe_ratio")
+    optSetting.add_parameter("len", 20, 300, 60)
+    optSetting.add_parameter("stpr", 15, 50, 5)
+    optSetting.add_parameter("n", 20, 90, 30)
+    doTestBfOptimization(w_s12_strategy.WS12Strategy, 'RBL9', 'SHFE', startDate, endDate, 0.0002,
+                         1, 10, 1, 15000, 60, optSetting)
 
     # 动态参数优化
     trainDay = 240
@@ -413,4 +368,5 @@ if __name__ == "__main__":
     # importHistoryDataFromTxt(r'D:\Weo\通达信导出K线数据\期货\5分钟K线\txt格式', Interval.MINUTE5, encoding='gb2312')
     # importHistoryDataFromTxt(r'D:\Weo\通达信导出K线数据\期货\日K线\txt格式', Interval.DAILY, encoding='gb2312')
 
-    # doTestCommon()  # 调试
+    t1 = datetime.now()
+    print(f'\n>>>>>>总耗时{t1 - t0}s')
