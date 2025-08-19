@@ -531,13 +531,13 @@ class ArrayManager:
     2. calculating technical indicator value
     """
 
-    def __init__(self, size: int = 100, startDate: datetime = None) -> None:
+    def __init__(self, size: int = 100, cta_engine = None) -> None:
         """Constructor"""
         self.count: int = 0
         self.size: int = size
         self.inited: bool = False
 
-        self.startDate = startDate
+        self.cta_engine = cta_engine
 
         self.open_array: np.ndarray = np.zeros(size)
         self.high_array: np.ndarray = np.zeros(size)
@@ -554,9 +554,12 @@ class ArrayManager:
         Update new bar data into array manager.
         """
         self.count += 1
-        # if not self.inited and self.count >= self.size:
-        if not self.inited and (bar.datetime.replace(tzinfo=None) >= self.startDate if self.startDate is not None else
-                                self.count >= self.size):
+        # if not self.inited and self.count >= self.size * 0.93:  # 此处控制执行信号计算的时机，起码要跑出回测开始日期以前的最后一对交易信号
+        # if not self.inited and (bar.datetime.replace(tzinfo=None) >= self.startDate if self.startDate is not None else
+        #                         self.count >= self.size):  # 这样写会导致startDate之前的信号不延续，startDate开始重新计算信号
+        if not self.inited and (bar.datetime.replace(tzinfo=None) >= self.cta_engine.start +
+                                timedelta(days=-self.cta_engine.pre_load_month * 30.5)
+                                if self.cta_engine.start is not None else self.count >= self.size):
             self.inited = True
 
         self.open_array[:-1] = self.open_array[1:]
