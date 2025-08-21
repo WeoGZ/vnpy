@@ -19,6 +19,7 @@ def doTestBfOptimization(strategy_class, symbol, exchange, startDate: datetime, 
     optResults = executeTestBacktesting(strategy_class, {}, symbol + '.' + exchange, Interval.MINUTE5,
                                         startDate, endDate, rate, slippage, size, pricetick, capital, minuteWindow,
                                         onlyOptimized=True, optSetting=optSetting, output=True)
+    return optResults
 
 
 def doTestDynamicOptimization(startDate: datetime, endDate: datetime, trainDayLength: int, testDayLength: int):

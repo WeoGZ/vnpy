@@ -44,6 +44,8 @@ def doTestCommon():
     # print(f'isnan: {np.isnan(arr4)}')
 
     # list1 = [1, 2, 3, 4]
+    list1 = [4] * 5
+    print(list1)
     # print(f'con: {arr2 > 0 and list1 > 2}')
     # print(f'con: {tafunc.barlast(arr2 > 0 and arr3 < 3)}')
     # print(f'con: {tafunc.barlast(arr2 > 0 and arr2.shift(1) > 2)}')
@@ -67,11 +69,11 @@ def doTestCommon():
     # print(f'round list3: {np.around(list3, 1)}')
     # print(f'np.minimum: {np.minimum(arr2, arr3)}')
 
-    nn1 = 1
-    if nn1:
-        print(f'nn1 is not None')
-    else:
-        print(f'nn1 is None')
+    # nn1 = 1
+    # if nn1:
+    #     print(f'nn1 is not None')
+    # else:
+    #     print(f'nn1 is None')
 
 
 if __name__ == "__main__":

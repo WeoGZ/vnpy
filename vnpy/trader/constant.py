@@ -160,6 +160,15 @@ class Interval(Enum):
     MINUTE5 = "5m"
 
 
+class IntervalUnit(Enum):
+    """
+    Interval unit of bar data.
+    """
+    MINUTE = "m"
+    DAILY = "d"
+    TICK = "tick"
+
+
 # 30分钟白天交易时间分段K线结束时间
 TRADE_TIME_DAYTIME_30M: list[tuple] = [(9, 30), (10, 0), (10, 45), (11, 15), (13, 45), (14, 15), (14, 45), (15, 0)]
 # 1小时白天交易时间分段K线结束时间

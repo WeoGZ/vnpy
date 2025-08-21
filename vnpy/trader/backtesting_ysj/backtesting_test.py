@@ -18,8 +18,7 @@ class PeriodType(enum.Enum):
 
 
 def doTestBacktesting():
-    # startDate = datetime(2023, 1, 5, 9, 0)
-    startDate = datetime(2024, 1, 1, 9, 0)
+    startDate = datetime(2024, 1, 1, 9, 0, 0, 0)
     endDate = datetime(2024, 12, 31)
     daily_pnl, statistic = executeTestBacktesting(w_s12_strategy.WS12Strategy, {"len": 250, "stpr": 20, "n": 70},
                                                   "RBL9.SHFE", Interval.MINUTE5, startDate, endDate,
