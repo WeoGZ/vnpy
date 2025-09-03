@@ -51,8 +51,8 @@ def get_quarter_end_date(d: datetime):
 def save_to_db(results: list, strategy_class, vt_symbol, interval: str, start_date: datetime, end_date: datetime,
                target: str, remark: str, generate_datetime: datetime):
     """写入数据库"""
-    # db_engine = create_engine('mysql+pymysql://ucnotkline:%s@192.168.2.205:3306/fitlab_data' % parse.unquote_plus('ucnotkline@205'))
-    db_engine = create_engine('mysql+pymysql://root:%s@localhost:3306/vnpy' % parse.unquote_plus('admin'))
+    db_engine = create_engine('mysql+pymysql://ucnotkline:%s@192.168.2.205:3306/vnpy' % parse.quote_plus('ucnotkline@205'))
+    # db_engine = create_engine('mysql+pymysql://root:%s@localhost:3306/vnpy' % parse.unquote_plus('admin'))
 
     table_columns = ['strategy', 'vt_symbol', 'period', 'start_date', 'end_date', 'target', 'target_value', 'params',
                      'remark', 'generate_datetime']
@@ -78,8 +78,8 @@ if __name__ == "__main__":
     """"""
     t0 = datetime.now()
 
-    startDate = datetime(2024, 1, 1)
-    endDate = datetime(2024, 12, 31)
+    startDate = datetime(2023, 12, 1)
+    endDate = datetime(2023, 12, 31)
     optSetting = OptimizationSetting()
     optSetting.set_target("sharpe_ratio")
     optSetting.add_parameter("len", 20, 40, 10)
