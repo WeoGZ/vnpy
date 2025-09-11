@@ -31,6 +31,10 @@ SETTINGS: dict = {
     "database.timezone": get_localzone_name(),
     "database.name": "mysql",
     "database.database": "vnpy",
+    # "database.host": "localhost",
+    # "database.port": 3306,
+    # "database.user": "root",
+    # "database.password": "admin"
     "database.host": "192.168.2.205",
     "database.port": 3306,
     "database.user": "ucnotkline",
