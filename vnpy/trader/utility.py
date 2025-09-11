@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo, available_timezones      # noqa
 
 from .object import BarData, TickData
 # from .constant import Exchange, Interval
-from .locale2 import _
+from .locale import _
 from .constant import *
 
 

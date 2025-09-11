@@ -5,7 +5,7 @@ General constant enums used in the trading platform.
 from enum import Enum
 from datetime import datetime, timedelta
 
-from .locale2 import _
+from .locale import _
 
 
 class Direction(Enum):
