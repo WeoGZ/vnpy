@@ -78,15 +78,15 @@ if __name__ == "__main__":
     """"""
     t0 = datetime.now()
 
-    startDate = datetime(2023, 12, 1)
-    endDate = datetime(2023, 12, 31)
+    startDate = datetime(2022, 1, 1)
+    endDate = datetime(2022, 12, 31)
     optSetting = OptimizationSetting()
     optSetting.set_target("sharpe_ratio")
-    optSetting.add_parameter("len", 20, 40, 10)
-    optSetting.add_parameter("stpr", 15, 25, 5)
-    optSetting.add_parameter("n", 20, 40, 10)
+    optSetting.add_parameter("len", 20, 300, 20)
+    optSetting.add_parameter("stpr", 20, 50, 10)
+    optSetting.add_parameter("n", 20, 70, 10)
     prepare_data_1(PeriodType.Quarter, startDate, endDate, w_s12_strategy.WS12Strategy, 'RBL9', 'SHFE',
-                   0.0002, 1, 10, 1, 15000, 60, IntervalUnit.MINUTE, optSetting)
+                   0.0002, 1, 10, 1, 15000, 30, IntervalUnit.MINUTE, optSetting)
 
     t1 = datetime.now()
     print(f'\n>>>>>>总耗时{t1 - t0}s')
