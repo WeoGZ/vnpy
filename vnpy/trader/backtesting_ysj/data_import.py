@@ -8,8 +8,8 @@ from vnpy.trader.object import BarData
 from vnpy.trader.utility import round_to
 
 
-def importHistoryDataFromTxt(directory, interval, encoding='utf-8'):
-    '''指定目錄下文件編碼類型'''
+def importHistoryDataFromTxt(directory, interval, encoding='utf-8', specified_symbols: list = None):
+    '''指定目錄下文件編碼類型。specified_symbols：目录下指定的标的，只导入这些标的K线数据'''
     database: BaseDatabase = None
     # 获取螺纹钢指数的所有交易日
     allTradeDates = getAllTradeDate('RBL9', Exchange.SHFE, datetime(2000, 1, 1),
@@ -22,6 +22,10 @@ def importHistoryDataFromTxt(directory, interval, encoding='utf-8'):
             # if file.__eq__('30#RBL9.txt'):
             marketTag = file.split('.')[0].split('#')[0]
             symbol = file.split('.')[0].split('#')[1]
+            if specified_symbols is not None:
+                if symbol not in specified_symbols:
+                    print(f'###{symbol}不是指定的标的范围，跳过')
+                    continue
             exchange = getExchange(marketTag)
             print(f'\n[{datetime.now()}] >>[{symbol}] reading...')
             file_path = os.path.join(directory, file)
@@ -92,12 +96,20 @@ def importHistoryDataFromTxt(directory, interval, encoding='utf-8'):
 
 
 if __name__ == "__main__":
-    """"""
+    """
+    #################################################################################################################
+    注意：
+    1.文件必须是通达信导出的txt文件（行情界面输入“34”——高级导出——日线、5分钟线各导一次，而且导出前需要先在“盘后数据下载”下载扩展市场行情）
+    2.执行此程序前，要先将object.py的BarData类的close_datetime属性注释掉（定制的属性），否则会报错；事后要恢复，否则策略回测等逻辑会报错
+    3.先导入日线数据，再导入5分钟数据，否则没有夜盘数据（因为导入5分钟数据时需要读取日线数据来获取交易日日期）
+    #################################################################################################################
+    """
     t0 = datetime.now()
 
     # 导数据
-    importHistoryDataFromTxt(r'D:\Weo\通达信导出K线数据\期货\5分钟K线\txt格式', Interval.MINUTE5, encoding='gb2312')
-    # importHistoryDataFromTxt(r'D:\Weo\通达信导出K线数据\期货\日K线\txt格式', Interval.DAILY, encoding='gb2312')
+    importHistoryDataFromTxt(r'D:\Weo\通达信导出K线数据\期货\5分钟K线\txt格式_更新至20251219', Interval.MINUTE5, encoding='gb2312')
+    # importHistoryDataFromTxt(r'D:\Weo\通达信导出K线数据\期货\5分钟K线\txt格式', Interval.MINUTE5, encoding='gb2312')
+    # importHistoryDataFromTxt(r'D:\Weo\通达信导出K线数据\期货\日K线\txt格式_更新至20251219', Interval.DAILY, encoding='gb2312')
 
     t1 = datetime.now()
     print(f'\n>>>>>>总耗时{t1 - t0}s')

@@ -10,14 +10,8 @@ from vnpy.trader.database import get_database, BaseDatabase
 from vnpy.trader.object import BarData
 from vnpy.trader.utility import round_to
 
-
-"""
-################################################################################
-注意：沪金、沪银、原油这三个品种由于夜盘时间去到02:30:00，因此60m、120m K线的起止时间划分跟其他品种不一样，要特殊处理，当前未做处理，
-以后有需要再改
-################################################################################
-"""
-
+# 夜盘到02:30:00的品种（沪金AUL9、沪银AGL9、原油SCL9）
+SPECIAL_FUTURES = ['AUL9', 'AGL9', 'SCL9']
 
 # 15分钟K线结束时间
 TRADE_TIME_15M: list[tuple] = [(9, 15), (9, 30), (9, 45), (10, 0), (10, 15), (10, 45), (11, 0), (11, 15), (11, 30),
@@ -26,11 +20,15 @@ TRADE_TIME_15M: list[tuple] = [(9, 15), (9, 30), (9, 45), (10, 0), (10, 15), (10
                                (0, 15), (0, 30), (0, 45), (1, 0)]
 # 30分钟K线结束时间
 TRADE_TIME_30M: list[tuple] = [(9, 30), (10, 0), (10, 45), (11, 15), (13, 45), (14, 15), (14, 45), (15, 0), (21, 30),
-                               (22, 0), (22, 30), (23, 0), (23, 30), (0, 0), (0, 30), (1, 0)]
+                               (22, 0), (22, 30), (23, 0), (23, 30), (0, 0), (0, 30), (1, 0), (1, 30), (2, 0), (2, 30)]
 # 60分钟K线结束时间
 TRADE_TIME_60M: list[tuple] = [(10, 0), (11, 15), (14, 15), (15, 0), (22, 0), (23, 0), (0, 0), (1, 0)]
+TRADE_TIME_60M_SPECIAL: list[tuple] = [(9, 30), (10, 45), (13, 45), (14, 45), (15, 0), (22, 0), (23, 0), (0, 0), (1, 0),
+                                       (2, 0)]
 # 120分钟K线结束时间
 TRADE_TIME_120M: list[tuple] = [(11, 15), (15, 0), (23, 0), (1, 0)]
+TRADE_TIME_120M_SPECIAL: list[tuple] = [(9, 30), (13, 45), (15, 0), (23, 0), (1, 0)]
+
 
 def generate(start_date: datetime, end_date: datetime, new_interval: int, symbols: list = None):
     """用5分钟K线合成新周期K线（新周期仅限分钟级别）"""
@@ -38,22 +36,13 @@ def generate(start_date: datetime, end_date: datetime, new_interval: int, symbol
         print(f'*****interval should be in [15, 30, 60, 120]')
         return
 
-    # 商品期货K线周期每根K线的结束时间
-    tradeTimeList = TRADE_TIME_15M
-    if new_interval == 30:
-        tradeTimeList = TRADE_TIME_30M
-    elif new_interval == 60:
-        tradeTimeList = TRADE_TIME_60M
-    elif new_interval == 120:
-        tradeTimeList = TRADE_TIME_120M
-
     db_engine = create_engine('mysql+pymysql://root:%s@localhost:3306/vnpy' % parse.quote_plus('admin'))
     df_symbols = symbols
     if df_symbols is None:
         query_symbols_sql = "SELECT DISTINCT symbol FROM `dbbardata` ORDER BY symbol;"
         df_symbols = pd.read_sql_query(query_symbols_sql, db_engine)['symbol'].tolist()
     if df_symbols is not None and len(df_symbols) > 0:
-        print(f'>>待合成K线的标的数量={len(df_symbols)}')
+        print(f'>>待合成K线的标的数量={len(df_symbols)}, interval={new_interval}m')
         for symbol in df_symbols:
             query_kline_sql = "SELECT * FROM `dbbardata` WHERE symbol='%s' and `interval`='5m' and datetime>='%s' \
                 and datetime<='%s' ORDER BY datetime;" % (symbol, start_date.strftime('%Y-%m-%d %H:%M:%S'),
@@ -66,6 +55,22 @@ def generate(start_date: datetime, end_date: datetime, new_interval: int, symbol
                 new_klines: list[dict] = []
                 bar: dict = None
                 kline_5m_count = 0
+
+                # 商品期货K线周期每根K线的结束时间
+                tradeTimeList = TRADE_TIME_15M
+                if new_interval == 30:
+                    tradeTimeList = TRADE_TIME_30M
+                elif new_interval == 60:
+                    tradeTimeList = TRADE_TIME_60M
+                elif new_interval == 120:
+                    tradeTimeList = TRADE_TIME_120M
+
+                # 特殊品种60m、120m的夜盘时间切分更换
+                if symbol in SPECIAL_FUTURES:
+                    if new_interval == 60:
+                        tradeTimeList = TRADE_TIME_60M_SPECIAL
+                    elif new_interval == 120:
+                        tradeTimeList = TRADE_TIME_120M_SPECIAL
 
                 for i in df_klines_5m.index:
                     kl = df_klines_5m.loc[i]
@@ -88,6 +93,12 @@ def generate(start_date: datetime, end_date: datetime, new_interval: int, symbol
                     nextBarTime = dt + INTERVAL_DELTA_MAP[Interval.MINUTE5]
                     for tradetimeTuple in tradeTimeList:
                         if nextBarTime.hour == tradetimeTuple[0] and nextBarTime.minute == tradetimeTuple[1]:
+                            # 特殊品种的60m、120m在节假日后第一天首根K线的开始时间要特殊处理（因为放假没有夜盘，开始时间会变为09:00:00）
+                            if (symbol in SPECIAL_FUTURES and new_interval in [60, 120] and tradetimeTuple[0] == 9 and
+                                    tradetimeTuple[1] == 30):
+                                bar['datetime'] = bar['datetime'].replace(hour=tradeTimeList[-1][0],
+                                                                          minute=tradeTimeList[-1][1], second=0,
+                                                                          microsecond=0)
                             new_klines.append(bar)
 
                             bar = None
@@ -103,11 +114,12 @@ if __name__ == "__main__":
     t0 = datetime.now()
 
     startDate = datetime(2016, 1, 1, 9, 0, 0)
-    endDate = datetime(2025, 5, 14, 15, 0, 0)
-    for interval in [15, 30, 60]:
-        # 夜盘特殊品种，夜盘时间去到01:00:00
-        night_special_types = ['AGL9','ALL9','AOL9','AUL9','BCL9','CUL9','NIL9','PBL9','SCL9','SNL9','SSL9','ZNL9']
-        generate(startDate, endDate, interval, night_special_types)
+    endDate = datetime(2025, 12, 19, 15, 0, 0)
+    for interval in [15, 30, 60, 120]:
+        # symbols = ['ALL9','AOL9','BCL9','CUL9','NIL9','PBL9','SNL9','SSL9','ZNL9']  # 夜盘到01:00:00
+        # symbols = ['AUL9', 'RBL9']  # for test
+        # generate(startDate, endDate, interval, symbols)  # 指定品种
+        generate(startDate, endDate, interval)  # 全部品种
 
     t1 = datetime.now()
     print(f'\n>>>>>>总耗时{t1 - t0}s')
